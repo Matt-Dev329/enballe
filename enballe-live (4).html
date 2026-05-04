@@ -1,0 +1,1559 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ENBALLE — Démo interactive temps réel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --pink:#FF1F6B;
+    --pink-2:#FF4F8B;
+    --pink-soft:#FFE5EE;
+    --pink-bg:#FFF5F8;
+    --black:#0D0D0D;
+    --grey-900:#1A1A1A;
+    --grey-700:#3A3A3A;
+    --grey-500:#7A7A7A;
+    --grey-300:#D9D9D9;
+    --grey-200:#E8E8E8;
+    --grey-100:#F5F5F5;
+    --grey-50:#FAFAFA;
+    --green:#22C55E;
+    --green-bg:#DCFCE7;
+    --red:#EF4444;
+    --red-bg:#FEE2E2;
+    --orange:#F97316;
+    --orange-bg:#FFEDD5;
+    --blue:#3B82F6;
+    --blue-bg:#DBEAFE;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;font-family:'Inter',sans-serif}
+  body{background:var(--grey-100);color:var(--black);min-height:100vh;padding-bottom:100px}
+  button{cursor:pointer;border:none;background:none;font-family:inherit}
+
+  /* TOP STATUS BAR */
+  .live-bar{
+    background:var(--black);color:#fff;padding:12px 24px;
+    display:flex;align-items:center;justify-content:space-between;
+    position:sticky;top:0;z-index:100;
+  }
+  .live-bar .brand{font-family:'Anton',sans-serif;font-size:18px;letter-spacing:1px}
+  .live-bar .brand .b{color:var(--pink)}
+  .live-bar .brand .tag{font-family:'Inter',sans-serif;font-size:9px;font-weight:700;color:var(--grey-500);letter-spacing:2px;margin-left:6px}
+  .live-stats{display:flex;gap:24px;align-items:center}
+  .live-stat{font-size:11px;color:rgba(255,255,255,.5);font-weight:600;letter-spacing:.5px}
+  .live-stat strong{color:#fff;font-size:14px;font-weight:700;display:block;font-family:'Anton',sans-serif;letter-spacing:.5px}
+  .live-stat.pulse strong{color:var(--pink)}
+  .live-pulse{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 0 0 rgba(34,197,94,.5);animation:pulse 2s infinite;display:inline-block;margin-right:6px}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(34,197,94,.6)}70%{box-shadow:0 0 0 8px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}
+  .reset-btn{background:rgba(255,255,255,.08);color:#fff;padding:6px 12px;border-radius:100px;font-size:11px;font-weight:600;border:1px solid rgba(255,255,255,.15)}
+  .reset-btn:hover{background:rgba(255,255,255,.15)}
+
+  /* MAIN LAYOUT - 3 COLUMNS */
+  .universe{
+    display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;
+    min-height:calc(100vh - 120px);
+  }
+  .col{
+    background:var(--grey-50);border-right:2px solid var(--grey-200);
+    display:flex;flex-direction:column;min-height:100%;
+  }
+  .col:last-child{border-right:none}
+
+  .col-header{
+    padding:14px 18px;background:#fff;border-bottom:1px solid var(--grey-200);
+    display:flex;align-items:center;justify-content:space-between;
+  }
+  .col-header h2{font-size:13px;font-weight:800;letter-spacing:.5px;text-transform:uppercase}
+  .col-header h2 span{display:block;font-size:10px;font-weight:600;color:var(--grey-500);letter-spacing:1px;margin-top:2px}
+  .col.site h2{color:var(--pink)}
+  .col.pos h2{color:#7C3AED}
+  .col.admin h2{color:var(--green)}
+  .col-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff}
+  .col.site .col-icon{background:var(--pink)}
+  .col.pos .col-icon{background:#7C3AED}
+  .col.admin .col-icon{background:var(--green)}
+
+  .col-body{flex:1;padding:16px;overflow-y:auto}
+
+  /* TOAST NOTIFICATIONS */
+  .toast-zone{
+    position:fixed;top:80px;right:20px;z-index:9999;
+    display:flex;flex-direction:column;gap:8px;pointer-events:none;
+  }
+  .toast{
+    background:#fff;border-left:4px solid var(--pink);padding:12px 16px;
+    border-radius:10px;box-shadow:0 8px 30px -8px rgba(0,0,0,.2);
+    min-width:280px;animation:slideIn .3s ease;font-size:13px;
+  }
+  .toast.green{border-color:var(--green)}
+  .toast.orange{border-color:var(--orange)}
+  .toast.red{border-color:var(--red)}
+  .toast strong{font-weight:700;display:block;margin-bottom:2px;font-size:13px}
+  .toast small{color:var(--grey-500);font-size:11px}
+  @keyframes slideIn{from{transform:translateX(110%);opacity:0}to{transform:translateX(0);opacity:1}}
+
+  /* SITE SECTION */
+  .site-hero{background:var(--black);color:#fff;padding:18px;border-radius:12px;margin-bottom:12px;text-align:center;position:relative;overflow:hidden}
+  .site-hero::before{content:'';position:absolute;top:-30px;right:-30px;width:100px;height:100px;background:var(--pink);border-radius:50%;opacity:.3;filter:blur(40px)}
+  .site-hero .h{font-family:'Anton',sans-serif;font-size:22px;letter-spacing:1px;line-height:1;margin-bottom:4px;position:relative}
+  .site-hero .h .py{color:var(--pink)}
+  .site-hero p{font-size:11px;color:rgba(255,255,255,.7);position:relative}
+
+  .filters{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+  .filter-chip{background:#fff;border:1px solid var(--grey-200);padding:6px 12px;border-radius:100px;font-size:11px;font-weight:600;color:var(--grey-700);transition:all .15s}
+  .filter-chip:hover{border-color:var(--pink);color:var(--pink)}
+  .filter-chip.active{background:var(--black);color:#fff;border-color:var(--black)}
+
+  .product-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .product{background:#fff;border:1px solid var(--grey-200);border-radius:12px;padding:10px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
+  .product:hover{transform:translateY(-2px);border-color:var(--pink);box-shadow:0 8px 20px -8px rgba(255,31,107,.3)}
+  .product .thumb{aspect-ratio:1;background:linear-gradient(135deg,var(--pink-soft),var(--pink-bg));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:32px;margin-bottom:8px;position:relative}
+  .product.out-of-stock{opacity:.5;cursor:not-allowed}
+  .product.out-of-stock::after{content:'ÉPUISÉ';position:absolute;top:14px;right:14px;background:var(--red);color:#fff;font-size:9px;font-weight:800;padding:3px 7px;border-radius:6px;letter-spacing:.5px}
+  .product .nm{font-size:12px;font-weight:700;line-height:1.2;margin-bottom:2px}
+  .product .meta{font-size:10px;color:var(--grey-500);margin-bottom:6px}
+  .product .price{display:flex;align-items:center;justify-content:space-between}
+  .product .price .v{font-size:13px;font-weight:800;color:var(--pink)}
+  .product .price .s{font-size:9px;color:var(--grey-500);font-weight:600}
+  .product .stock-badge{position:absolute;top:12px;left:12px;background:rgba(0,0,0,.7);color:#fff;font-size:9px;font-weight:700;padding:3px 7px;border-radius:6px;backdrop-filter:blur(4px)}
+  .product .stock-badge.low{background:var(--orange)}
+
+  /* RESERVATION MODAL */
+  .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)}
+  .modal.show{display:flex;animation:fadeBg .2s}
+  @keyframes fadeBg{from{opacity:0}to{opacity:1}}
+  .modal-content{background:#fff;border-radius:18px;max-width:480px;width:100%;max-height:90vh;overflow-y:auto;animation:popIn .25s ease}
+  @keyframes popIn{from{transform:scale(.9);opacity:0}to{transform:scale(1);opacity:1}}
+  .modal-head{padding:20px 22px 14px;border-bottom:1px solid var(--grey-200);display:flex;align-items:center;justify-content:space-between}
+  .modal-head h3{font-size:16px;font-weight:800;letter-spacing:-.3px}
+  .modal-close{width:30px;height:30px;border-radius:50%;background:var(--grey-100);display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--grey-700);transition:all .15s}
+  .modal-close:hover{background:var(--grey-200)}
+  .modal-body{padding:20px 22px}
+  .modal-product{display:flex;gap:14px;padding:14px;background:var(--pink-bg);border-radius:12px;margin-bottom:18px}
+  .modal-product .t{width:60px;height:60px;border-radius:10px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0}
+  .modal-product .info .nm{font-size:14px;font-weight:700;margin-bottom:2px}
+  .modal-product .info .meta{font-size:11px;color:var(--grey-700)}
+  .modal-product .info .price{font-size:13px;font-weight:800;color:var(--pink);margin-top:4px}
+
+  .form-group{margin-bottom:14px}
+  .form-group label{display:block;font-size:11px;font-weight:700;color:var(--grey-700);letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px}
+  .form-group input,.form-group select{width:100%;padding:10px 14px;border:1.5px solid var(--grey-200);border-radius:10px;font-size:13px;font-family:inherit;outline:none;transition:all .15s}
+  .form-group input:focus,.form-group select:focus{border-color:var(--pink)}
+  .form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+  .summary-box{background:var(--grey-50);border-radius:12px;padding:14px;margin-bottom:14px}
+  .summary-row{display:flex;justify-content:space-between;font-size:12px;padding:4px 0}
+  .summary-row.tot{padding-top:8px;margin-top:6px;border-top:1px solid var(--grey-200);font-weight:700;font-size:14px}
+  .summary-row.tot .v{color:var(--pink);font-size:18px;font-family:'Anton',sans-serif}
+
+  .deposit-note{background:var(--orange-bg);border-radius:10px;padding:10px;margin-bottom:14px;font-size:11px;color:#9A3412;line-height:1.4}
+  .deposit-note strong{font-weight:700}
+
+  .btn-pay{width:100%;background:var(--pink);color:#fff;padding:14px;border-radius:12px;font-size:14px;font-weight:700;letter-spacing:.3px;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .15s}
+  .btn-pay:hover{background:var(--pink-2);transform:translateY(-1px);box-shadow:0 8px 20px -6px rgba(255,31,107,.4)}
+
+  /* POS SECTION */
+  .pos-hero{background:linear-gradient(135deg,#7C3AED,#A855F7);color:#fff;padding:14px 16px;border-radius:12px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center}
+  .pos-hero .who{font-size:11px;opacity:.85;font-weight:600}
+  .pos-hero .name{font-size:15px;font-weight:800;margin-top:2px}
+  .pos-hero .clock{font-family:'Anton',sans-serif;font-size:24px;letter-spacing:1px}
+
+  .pos-tabs{display:flex;gap:4px;background:var(--grey-200);padding:4px;border-radius:100px;margin-bottom:12px}
+  .pos-tab{flex:1;padding:8px;border-radius:100px;font-size:11px;font-weight:700;text-align:center;color:var(--grey-700);cursor:pointer;transition:all .15s}
+  .pos-tab.active{background:#fff;color:#7C3AED;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+
+  .pos-pane{display:none}
+  .pos-pane.active{display:block}
+
+  .pickup-list{display:flex;flex-direction:column;gap:8px}
+  .pickup-card{background:#fff;border:1px solid var(--grey-200);border-radius:12px;padding:12px;transition:all .15s}
+  .pickup-card.confirmed{background:var(--green-bg);border-color:var(--green)}
+  .pickup-card .top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
+  .pickup-card .ref{font-size:10px;font-weight:800;color:#7C3AED;letter-spacing:.5px;font-family:monospace}
+  .pickup-card .time{font-size:10px;font-weight:600;color:var(--grey-500)}
+  .pickup-card .cust{font-size:13px;font-weight:700;margin-bottom:2px}
+  .pickup-card .items{font-size:11px;color:var(--grey-500)}
+  .pickup-card .actions{display:flex;gap:6px;margin-top:10px}
+  .pickup-card .btn-act{flex:1;padding:8px;font-size:11px;font-weight:700;border-radius:8px;text-align:center;transition:all .15s}
+  .pickup-card .btn-act.primary{background:#7C3AED;color:#fff}
+  .pickup-card .btn-act.primary:hover{background:#6D28D9}
+  .pickup-card .btn-act.success{background:var(--green);color:#fff}
+
+  .quick-sell{background:#fff;border:1px solid var(--grey-200);border-radius:12px;padding:14px;margin-bottom:12px}
+  .quick-sell h4{font-size:11px;font-weight:800;color:var(--grey-700);letter-spacing:.5px;text-transform:uppercase;margin-bottom:10px}
+  .accessory-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .accessory-btn{background:var(--grey-50);border:1px solid var(--grey-200);padding:10px 8px;border-radius:8px;text-align:center;cursor:pointer;transition:all .15s}
+  .accessory-btn:hover{border-color:#7C3AED;background:#F5F3FF}
+  .accessory-btn .em{font-size:20px;margin-bottom:2px}
+  .accessory-btn .nm{font-size:10px;font-weight:700;line-height:1.1}
+  .accessory-btn .pr{font-size:11px;font-weight:800;color:#7C3AED;margin-top:2px}
+  .accessory-btn:disabled{opacity:.4;cursor:not-allowed}
+
+  .cart-current{background:#fff;border:2px dashed var(--grey-300);border-radius:12px;padding:14px;margin-bottom:12px;min-height:80px}
+  .cart-current.has-items{border-style:solid;border-color:#7C3AED}
+  .cart-empty{text-align:center;color:var(--grey-500);font-size:12px;padding:14px 0}
+  .cart-line{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px dashed var(--grey-200);font-size:12px}
+  .cart-line:last-child{border-bottom:none}
+  .cart-line .nm{font-weight:600}
+  .cart-line .pr{font-weight:700}
+  .cart-line .rm{color:var(--red);cursor:pointer;margin-left:6px;font-size:14px}
+  .cart-total{margin-top:10px;padding-top:10px;border-top:2px solid var(--grey-200);display:flex;justify-content:space-between;font-weight:800;font-size:14px}
+  .cart-total .v{color:#7C3AED;font-family:'Anton',sans-serif;font-size:20px}
+
+  .pay-buttons{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .pay-btn{padding:12px;border-radius:10px;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px;transition:all .15s}
+  .pay-btn.cb{background:#7C3AED;color:#fff}
+  .pay-btn.cb:hover{background:#6D28D9}
+  .pay-btn.cash{background:#fff;color:#7C3AED;border:2px solid #7C3AED}
+  .pay-btn.cash:hover{background:#F5F3FF}
+  .pay-btn:disabled{opacity:.4;cursor:not-allowed}
+
+  .ticket{background:#FFFAF0;border:1px dashed #92400E;border-radius:8px;padding:14px;font-family:monospace;font-size:11px;margin-top:14px;display:none;animation:popIn .3s}
+  .ticket.show{display:block}
+  .ticket-head{text-align:center;border-bottom:1px dashed #92400E;padding-bottom:8px;margin-bottom:8px}
+  .ticket-head .b{font-family:'Anton',sans-serif;font-size:16px;letter-spacing:1px;color:var(--black)}
+  .ticket-head .b .py{color:var(--pink)}
+  .ticket-line{display:flex;justify-content:space-between;padding:2px 0}
+  .ticket-tot{border-top:1px dashed #92400E;padding-top:6px;margin-top:6px;font-weight:700;font-size:13px}
+  .ticket-foot{text-align:center;margin-top:10px;padding-top:8px;border-top:1px dashed #92400E;font-size:9px;color:#92400E}
+
+  /* ADMIN SECTION */
+  .admin-kpis{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+  .admin-kpi{background:#fff;border:1px solid var(--grey-200);border-radius:12px;padding:12px;position:relative;overflow:hidden}
+  .admin-kpi.flash{animation:flashUpdate .8s ease}
+  @keyframes flashUpdate{0%,100%{background:#fff}50%{background:var(--green-bg)}}
+  .admin-kpi .lbl{font-size:9px;font-weight:800;color:var(--grey-500);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px}
+  .admin-kpi .v{font-size:22px;font-weight:800;letter-spacing:-.5px;line-height:1;font-family:'Anton',sans-serif}
+  .admin-kpi.green .v{color:var(--green)}
+  .admin-kpi.pink .v{color:var(--pink)}
+  .admin-kpi.purple .v{color:#7C3AED}
+  .admin-kpi.orange .v{color:var(--orange)}
+  .admin-kpi .delta{font-size:10px;font-weight:600;color:var(--grey-500);margin-top:4px}
+
+  .admin-section{background:#fff;border:1px solid var(--grey-200);border-radius:12px;padding:14px;margin-bottom:12px}
+  .admin-section h4{font-size:11px;font-weight:800;color:var(--grey-700);letter-spacing:.5px;text-transform:uppercase;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
+  .admin-section h4 span{background:var(--green-bg);color:#15803D;font-size:9px;padding:2px 8px;border-radius:100px;font-weight:700}
+
+  .feed{display:flex;flex-direction:column;gap:8px}
+  .feed-item{display:flex;gap:8px;padding:8px;background:var(--grey-50);border-radius:8px;font-size:11px;animation:slideInLeft .3s}
+  @keyframes slideInLeft{from{transform:translateX(-10px);opacity:0}to{transform:translateX(0);opacity:1}}
+  .feed-item .ico{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:11px;font-weight:800}
+  .feed-item .ico.green{background:var(--green-bg);color:#15803D}
+  .feed-item .ico.pink{background:var(--pink-soft);color:var(--pink)}
+  .feed-item .ico.purple{background:#EDE9FE;color:#7C3AED}
+  .feed-item .ico.orange{background:var(--orange-bg);color:#C2410C}
+  .feed-item .info{flex:1;min-width:0}
+  .feed-item .ttl{font-weight:700;line-height:1.3}
+  .feed-item .meta{color:var(--grey-500);font-size:10px;margin-top:1px}
+
+  .stock-mini{display:flex;flex-direction:column;gap:6px}
+  .stock-mini-row{display:flex;align-items:center;gap:8px;font-size:11px}
+  .stock-mini-row .em{width:26px;height:26px;border-radius:6px;background:var(--pink-bg);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+  .stock-mini-row .nm{flex:1;font-weight:600}
+  .stock-mini-row .qty{font-weight:800;font-family:'Anton',sans-serif;font-size:14px;letter-spacing:.5px}
+  .stock-mini-row .qty.low{color:var(--orange)}
+  .stock-mini-row .qty.out{color:var(--red)}
+  .stock-mini-row .qty.flash{animation:flashUpdate .8s}
+
+  .deposits-list{display:flex;flex-direction:column;gap:6px}
+  .deposit-row{display:flex;justify-content:space-between;align-items:center;padding:8px;background:var(--orange-bg);border-radius:8px;font-size:11px;animation:slideInLeft .3s}
+  .deposit-row .info .nm{font-weight:700;color:#9A3412}
+  .deposit-row .info .meta{color:#C2410C;font-size:10px;margin-top:1px}
+  .deposit-row .amt{font-weight:800;color:#9A3412;font-family:'Anton',sans-serif;font-size:14px}
+
+  .empty{text-align:center;padding:14px;color:var(--grey-500);font-size:11px;font-style:italic}
+
+  /* EXPLAIN BAR */
+  .explainer{
+    position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+    background:rgba(13,13,13,.95);backdrop-filter:blur(20px);color:#fff;
+    padding:12px 24px;border-radius:100px;z-index:9999;
+    display:flex;align-items:center;gap:14px;font-size:12px;
+    border:1px solid rgba(255,255,255,.1);
+    box-shadow:0 20px 60px -10px rgba(0,0,0,.5);
+    max-width:90vw;
+  }
+  .explainer .ico{width:28px;height:28px;border-radius:50%;background:var(--pink);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+  .explainer-text{font-weight:500;line-height:1.4}
+  .explainer-text strong{color:var(--pink);font-weight:700}
+
+  /* PICKUP CHOICE in modal */
+  .pickup-choice{display:flex;flex-direction:column;gap:8px}
+  .pickup-opt{display:flex;align-items:center;gap:12px;padding:12px;border:2px solid var(--grey-200);border-radius:12px;cursor:pointer;transition:all .15s;background:#fff;position:relative}
+  .pickup-opt:hover{border-color:var(--pink)}
+  .pickup-opt.active{border-color:var(--pink);background:var(--pink-bg)}
+  .pickup-opt .po-em{width:40px;height:40px;border-radius:10px;background:var(--pink-soft);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+  .pickup-opt.active .po-em{background:var(--pink);color:#fff}
+  .pickup-opt .po-info{flex:1;min-width:0}
+  .pickup-opt .po-nm{font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px}
+  .pickup-opt .po-mt{font-size:11px;color:var(--grey-500);margin-top:2px}
+  .pickup-opt .po-check{width:24px;height:24px;border-radius:50%;border:2px solid var(--grey-300);display:flex;align-items:center;justify-content:center;font-size:14px;color:transparent;flex-shrink:0;transition:all .15s}
+  .pickup-opt.active .po-check{background:var(--pink);border-color:var(--pink);color:#fff}
+  .po-badge{background:var(--pink);color:#fff;font-size:8px;font-weight:800;padding:2px 6px;border-radius:6px;letter-spacing:.5px}
+
+  /* LOCKER BANK in admin */
+  .locker-bank{background:var(--black);padding:14px;border-radius:14px}
+  .locker-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+  .locker-cell{aspect-ratio:1;background:#1A1A1A;border:1.5px solid #333;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:9px;color:rgba(255,255,255,.4);font-weight:700;cursor:pointer;transition:all .15s;position:relative;overflow:hidden}
+  .locker-cell:hover{border-color:#7C3AED}
+  .locker-cell.empty{background:#1A1A1A;color:rgba(255,255,255,.3)}
+  .locker-cell.deposited{background:linear-gradient(135deg,#7C3AED,#A855F7);border-color:#A855F7;color:#fff}
+  .locker-cell.deposited::before{content:'📦';font-size:18px;display:block;margin-bottom:2px}
+  .locker-cell.collected{background:linear-gradient(135deg,#FF1F6B,#FF4F8B);border-color:#FF4F8B;color:#fff}
+  .locker-cell.collected::before{content:'🎭';font-size:18px;display:block;margin-bottom:2px}
+  .locker-cell.returned{background:linear-gradient(135deg,#22C55E,#16A34A);border-color:#22C55E;color:#fff}
+  .locker-cell.returned::before{content:'↩️';font-size:18px;display:block;margin-bottom:2px}
+  .locker-cell .num{font-family:'Anton',sans-serif;font-size:14px;letter-spacing:.5px;line-height:1;margin-bottom:2px;color:rgba(255,255,255,.5)}
+  .locker-cell.empty .num{color:rgba(255,255,255,.5)}
+  .locker-cell:not(.empty) .num{color:#fff}
+  .locker-cell .ref{font-size:8px;font-weight:700;line-height:1.1}
+  .locker-legend{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;justify-content:center}
+  .locker-legend-item{display:flex;align-items:center;gap:4px;font-size:9px;color:rgba(255,255,255,.7);font-weight:600}
+  .locker-legend-dot{width:10px;height:10px;border-radius:3px}
+  .locker-legend-dot.empty{background:#333;border:1px solid #555}
+  .locker-legend-dot.deposited{background:#7C3AED}
+  .locker-legend-dot.collected{background:#FF1F6B}
+  .locker-legend-dot.returned{background:#22C55E}
+
+  /* MOBILE TABS NAV (mobile only) */
+  .mobile-tabs{display:none;position:sticky;top:108px;z-index:99;background:#fff;border-bottom:1px solid var(--grey-200);padding:8px;gap:4px}
+  .mobile-tab{flex:1;padding:10px 6px;border-radius:10px;font-size:10px;font-weight:700;text-align:center;color:var(--grey-500);cursor:pointer;transition:all .15s;display:flex;flex-direction:column;align-items:center;gap:3px;background:transparent;position:relative}
+  .mobile-tab .ico{font-size:18px;line-height:1}
+  .mobile-tab.active.site{background:var(--pink);color:#fff}
+  .mobile-tab.active.pos{background:#7C3AED;color:#fff}
+  .mobile-tab.active.admin{background:var(--green);color:#fff}
+  .mobile-tab .badge{position:absolute;top:4px;right:8px;background:var(--pink);color:#fff;font-size:9px;font-weight:800;padding:1px 6px;border-radius:100px;min-width:14px;text-align:center;line-height:1.4;animation:badgeBounce .5s ease}
+  .mobile-tab.active .badge{background:#fff;color:var(--pink)}
+  @keyframes badgeBounce{0%{transform:scale(0)}50%{transform:scale(1.3)}100%{transform:scale(1)}}
+
+  /* NOTIFICATION RING ANIMATION */
+  .ringing{animation:ring 0.5s ease-in-out 3}
+  @keyframes ring{0%,100%{transform:rotate(0)}25%{transform:rotate(-8deg)}75%{transform:rotate(8deg)}}
+
+  /* LITIGE MODAL specific styles */
+  .litige-banner{background:var(--red-bg);border:2px solid var(--red);border-radius:12px;padding:12px;margin-bottom:14px;display:flex;align-items:center;gap:10px}
+  .litige-banner .icon{width:36px;height:36px;border-radius:50%;background:var(--red);color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;font-weight:800}
+  .litige-banner .info h4{font-size:13px;font-weight:800;color:#991B1B;margin-bottom:1px}
+  .litige-banner .info p{font-size:11px;color:#991B1B}
+
+  .state-eval{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:14px}
+  .state-card{background:#fff;border:2px solid var(--grey-200);border-radius:10px;padding:10px;text-align:center;cursor:pointer;transition:all .15s}
+  .state-card:hover{border-color:var(--pink)}
+  .state-card.selected.minor{border-color:var(--orange);background:var(--orange-bg)}
+  .state-card.selected.major{border-color:var(--red);background:var(--red-bg)}
+  .state-card .em{font-size:22px;margin-bottom:4px}
+  .state-card .lb{font-size:11px;font-weight:700}
+  .state-card .pr{font-size:10px;color:var(--grey-500);margin-top:2px}
+  .state-card.selected.minor .pr{color:#9A3412;font-weight:600}
+  .state-card.selected.major .pr{color:#991B1B;font-weight:600}
+
+  .amount-input-wrap{display:flex;align-items:center;gap:6px;margin-bottom:10px}
+  .amount-input-wrap input{flex:1;padding:14px;border:2px solid var(--red);border-radius:10px;font-size:22px;font-weight:800;text-align:center;font-family:'Anton',sans-serif;outline:none;color:#991B1B;letter-spacing:1px}
+  .amount-input-wrap .eur{font-size:22px;font-weight:800;color:#991B1B;font-family:'Anton',sans-serif}
+
+  .quick-amounts{display:flex;gap:4px;margin-bottom:14px}
+  .quick-amount{flex:1;padding:6px 4px;border:1px solid var(--grey-200);background:#fff;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;color:var(--grey-700);transition:all .15s}
+  .quick-amount:hover{border-color:var(--red);color:var(--red)}
+  .quick-amount.active{background:var(--red);color:#fff;border-color:var(--red)}
+
+  .btn-pay.danger{background:var(--red)}
+  .btn-pay.danger:hover{background:#DC2626}
+
+  /* KIOSK MODE */
+  .kiosk-overlay{display:none;position:fixed;inset:0;background:#fff;z-index:9998;flex-direction:column;animation:fadeBg .3s}
+  .kiosk-overlay.show{display:flex}
+  .kiosk-header{background:var(--black);color:#fff;padding:24px 32px;display:flex;justify-content:space-between;align-items:center}
+  .kiosk-header .b{font-family:'Anton',sans-serif;font-size:36px;letter-spacing:2px}
+  .kiosk-header .b .py{color:var(--pink)}
+  .kiosk-header .b .tg{font-family:'Inter',sans-serif;font-size:11px;font-weight:700;color:var(--grey-500);letter-spacing:3px;margin-left:14px;vertical-align:middle}
+  .kiosk-exit{background:rgba(255,255,255,.1);color:#fff;padding:10px 20px;border-radius:100px;font-size:12px;font-weight:600}
+  .kiosk-exit:hover{background:rgba(255,255,255,.2)}
+  .kiosk-body{flex:1;padding:40px;background:var(--pink-bg);overflow-y:auto}
+  .kiosk-hero{text-align:center;margin-bottom:32px}
+  .kiosk-hero h1{font-family:'Anton',sans-serif;font-size:54px;letter-spacing:2px;margin-bottom:12px;color:var(--black);line-height:1}
+  .kiosk-hero h1 .py{color:var(--pink)}
+  .kiosk-hero p{font-size:18px;color:var(--grey-700);font-weight:500}
+  .kiosk-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;max-width:1200px;margin:0 auto}
+  .kiosk-product{background:#fff;border:2px solid transparent;border-radius:18px;padding:18px;cursor:pointer;transition:all .2s;text-align:center}
+  .kiosk-product:hover{transform:translateY(-4px);border-color:var(--pink);box-shadow:0 16px 40px -10px rgba(255,31,107,.3)}
+  .kiosk-product.out{opacity:.4;cursor:not-allowed;pointer-events:none}
+  .kiosk-product .thumb{aspect-ratio:1;background:linear-gradient(135deg,var(--pink-soft),var(--pink-bg));border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:64px;margin-bottom:14px;position:relative}
+  .kiosk-product .stk{position:absolute;top:10px;right:10px;background:rgba(0,0,0,.7);color:#fff;font-size:11px;font-weight:700;padding:4px 10px;border-radius:8px;backdrop-filter:blur(4px)}
+  .kiosk-product .stk.low{background:var(--orange)}
+  .kiosk-product .nm{font-size:18px;font-weight:800;margin-bottom:4px;letter-spacing:-.3px}
+  .kiosk-product .meta{font-size:12px;color:var(--grey-500);margin-bottom:10px}
+  .kiosk-product .price{font-family:'Anton',sans-serif;font-size:24px;color:var(--pink);letter-spacing:.5px}
+  .kiosk-cta{display:inline-flex;align-items:center;gap:8px;background:var(--pink);color:#fff;padding:18px 36px;border-radius:100px;font-size:16px;font-weight:700;margin-top:14px;letter-spacing:.3px}
+
+  .kiosk-launch{background:linear-gradient(135deg,var(--pink),#FF4F8B);color:#fff;padding:14px 18px;border-radius:12px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;transition:all .15s}
+  .kiosk-launch:hover{transform:translateY(-1px);box-shadow:0 8px 24px -6px rgba(255,31,107,.5)}
+  .kiosk-launch .l h4{font-size:13px;font-weight:800;margin-bottom:2px}
+  .kiosk-launch .l p{font-size:11px;opacity:.9}
+  .kiosk-launch .arrow{width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+
+  /* SOUND TOGGLE */
+  .sound-toggle{background:rgba(255,255,255,.08);color:#fff;padding:6px 10px;border-radius:100px;font-size:11px;font-weight:600;border:1px solid rgba(255,255,255,.15);display:inline-flex;align-items:center;gap:5px;margin-right:6px}
+  .sound-toggle:hover{background:rgba(255,255,255,.15)}
+  .mobile-tab{flex:1;padding:10px 6px;border-radius:10px;font-size:10px;font-weight:700;text-align:center;color:var(--grey-500);cursor:pointer;transition:all .15s;display:flex;flex-direction:column;align-items:center;gap:3px;background:transparent;position:relative}
+  .mobile-tab .ico{font-size:18px;line-height:1}
+  .mobile-tab.active.site{background:var(--pink);color:#fff}
+  .mobile-tab.active.pos{background:#7C3AED;color:#fff}
+  .mobile-tab.active.admin{background:var(--green);color:#fff}
+  .mobile-tab .badge{position:absolute;top:4px;right:8px;background:var(--pink);color:#fff;font-size:9px;font-weight:800;padding:1px 6px;border-radius:100px;min-width:14px;text-align:center;line-height:1.4}
+  .mobile-tab.active .badge{background:#fff;color:var(--pink)}
+
+  @media (max-width:1100px){
+    .universe{grid-template-columns:1fr;min-height:auto}
+    .col{border-right:none;border-bottom:2px solid var(--grey-200);min-height:600px}
+    .product-grid{grid-template-columns:1fr 1fr 1fr}
+    .live-stats{gap:14px}
+    .live-stat{font-size:10px}
+  }
+
+  @media (max-width:768px){
+    body{padding-bottom:24px}
+
+    .live-bar{padding:10px 14px;flex-wrap:wrap;gap:8px;position:sticky;top:0}
+    .live-bar .brand{font-size:15px}
+    .live-stats{gap:10px;flex:1;justify-content:flex-end}
+    .live-stat{font-size:9px;text-align:center}
+    .live-stat strong{font-size:12px}
+    .live-stat:first-child{display:none}
+    .reset-btn{font-size:10px;padding:5px 10px}
+
+    .mobile-tabs{display:flex;top:54px}
+
+    .universe{display:block}
+    .col{display:none;border-bottom:none;min-height:calc(100vh - 200px)}
+    .col.active-mobile{display:flex}
+
+    .col-header{padding:12px 14px}
+    .col-header h2{font-size:11px}
+    .col-header h2 span{font-size:9px}
+    .col-icon{width:28px;height:28px;font-size:12px}
+    .col-body{padding:12px}
+
+    .product-grid{grid-template-columns:1fr 1fr;gap:8px}
+    .product{padding:8px}
+    .product .nm{font-size:11px}
+    .product .meta{font-size:9px}
+    .product .price .v{font-size:12px}
+    .product .stock-badge{font-size:8px;padding:2px 5px;top:8px;left:8px}
+    .site-hero{padding:14px}
+    .site-hero .h{font-size:18px}
+
+    .pos-hero{padding:12px}
+    .pos-hero .name{font-size:13px}
+    .pos-hero .clock{font-size:18px}
+    .pos-tab{font-size:10px;padding:7px 4px}
+    .accessory-btn{padding:10px 6px}
+    .accessory-btn .em{font-size:22px}
+    .accessory-btn .nm{font-size:9px}
+    .pickup-card .actions{flex-direction:column}
+    .pickup-card .btn-act{padding:11px;font-size:12px}
+
+    .admin-kpis{gap:6px}
+    .admin-kpi{padding:10px}
+    .admin-kpi .v{font-size:18px}
+    .admin-kpi .lbl{font-size:8px}
+    .admin-kpi .delta{font-size:9px}
+    .admin-section{padding:12px}
+
+    .modal{padding:0;align-items:flex-end}
+    .modal-content{max-height:94vh;border-radius:18px 18px 0 0;animation:slideUp .3s ease}
+    @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+    .modal-head{padding:16px 18px 12px;position:sticky;top:0;background:#fff;z-index:10}
+    .modal-head h3{font-size:15px}
+    .modal-body{padding:14px 18px 24px}
+    .form-row{gap:8px}
+    .form-group input,.form-group select{padding:11px 14px;font-size:14px}
+    .btn-pay{padding:14px;font-size:14px}
+
+    .toast-zone{top:auto;bottom:20px;right:10px;left:10px}
+    .toast{min-width:auto;font-size:12px;padding:10px 14px}
+
+    .explainer{display:none}
+  }
+
+  @media (max-width:380px){
+    .product-grid{grid-template-columns:1fr 1fr}
+    .accessory-grid{grid-template-columns:1fr 1fr}
+    .live-stats{gap:6px}
+    .live-stat strong{font-size:11px}
+  }
+</style>
+</head>
+<body>
+
+<div class="live-bar">
+  <div class="brand">EN<span class="b">B</span>ALLE<span class="tag">DÉMO LIVE</span></div>
+  <div class="live-stats">
+    <div class="live-stat"><span class="live-pulse"></span>Sync temps réel</div>
+    <div class="live-stat">CA jour<strong id="stat-ca">0 €</strong></div>
+    <div class="live-stat">Ventes<strong id="stat-ventes">0</strong></div>
+    <div class="live-stat pulse">Cautions bloquées<strong id="stat-cautions">0 €</strong></div>
+    <button class="sound-toggle" id="sound-btn" onclick="toggleSound()">🔊 Son ON</button>
+    <button class="reset-btn" onclick="resetAll()">↻ Reset démo</button>
+  </div>
+</div>
+
+<div class="mobile-tabs" id="mobile-tabs">
+  <button class="mobile-tab site active" onclick="switchMobileTab('site',this)">
+    <span class="ico">🛒</span>
+    <span>Site</span>
+  </button>
+  <button class="mobile-tab pos" onclick="switchMobileTab('pos',this)">
+    <span class="ico">💳</span>
+    <span>Caisse</span>
+    <span class="badge" id="pos-badge" style="display:none">0</span>
+  </button>
+  <button class="mobile-tab admin" onclick="switchMobileTab('admin',this)">
+    <span class="ico">📊</span>
+    <span>Admin</span>
+  </button>
+</div>
+
+<div class="universe">
+  <div class="col site active-mobile">
+    <div class="col-header">
+      <div>
+        <h2>Site web client<span>enballe.fr · vue mobile</span></h2>
+      </div>
+      <div class="col-icon">🛒</div>
+    </div>
+    <div class="col-body">
+      <div class="site-hero">
+        <div class="h">Prêt à <span class="py">enballer</span><br>la fête ?</div>
+        <p>Réservez en 2 min · livré ou retrait Dax</p>
+      </div>
+
+      <div class="filters">
+        <button class="filter-chip active" onclick="filterCat('all',this)">Tous</button>
+        <button class="filter-chip" onclick="filterCat('disco',this)">Disco</button>
+        <button class="filter-chip" onclick="filterCat('halloween',this)">Halloween</button>
+        <button class="filter-chip" onclick="filterCat('evg',this)">EVG</button>
+      </div>
+
+      <div class="product-grid" id="product-grid"></div>
+    </div>
+  </div>
+
+  <div class="col pos">
+    <div class="col-header">
+      <div>
+        <h2>Caisse boutique<span>tablette équipe Dax</span></h2>
+      </div>
+      <div class="col-icon">💳</div>
+    </div>
+    <div class="col-body">
+      <div class="pos-hero">
+        <div>
+          <div class="who">Connectée</div>
+          <div class="name">Sarah · Boutique Dax</div>
+        </div>
+        <div class="clock" id="pos-clock">14:32</div>
+      </div>
+
+      <div class="kiosk-launch" onclick="openKiosk()">
+        <div class="l">
+          <h4>🖥️ Mode borne libre-service</h4>
+          <p>Plein écran pour clients en boutique</p>
+        </div>
+        <div class="arrow">→</div>
+      </div>
+
+      <div class="pos-tabs">
+        <div class="pos-tab active" onclick="posTab('pickups',this)">Retraits réservations</div>
+        <div class="pos-tab" onclick="posTab('walkin',this)">Vente directe</div>
+      </div>
+
+      <div class="pos-pane active" id="pane-pickups">
+        <div class="pickup-list" id="pickup-list">
+          <div class="empty">Aucune réservation à retirer<br><small style="color:var(--grey-500);font-size:10px;display:block;margin-top:4px">Les nouvelles réservations du site apparaîtront ici</small></div>
+        </div>
+      </div>
+
+      <div class="pos-pane" id="pane-walkin">
+        <div class="quick-sell">
+          <h4>+ Ajouter au panier</h4>
+          <div class="accessory-grid">
+            <button class="accessory-btn" onclick="addAccessory('Chapeau Disco','🎩',18)">
+              <div class="em">🎩</div>
+              <div class="nm">Chapeau Disco</div>
+              <div class="pr">18€</div>
+            </button>
+            <button class="accessory-btn" onclick="addAccessory('Lunettes Néon','🕶️',12)">
+              <div class="em">🕶️</div>
+              <div class="nm">Lunettes Néon</div>
+              <div class="pr">12€</div>
+            </button>
+            <button class="accessory-btn" onclick="addAccessory('Perruque Afro','💇',25)">
+              <div class="em">💇</div>
+              <div class="nm">Perruque Afro</div>
+              <div class="pr">25€</div>
+            </button>
+            <button class="accessory-btn" onclick="addAccessory('Maquillage Kit','💄',15)">
+              <div class="em">💄</div>
+              <div class="nm">Maquillage Kit</div>
+              <div class="pr">15€</div>
+            </button>
+          </div>
+        </div>
+
+        <div class="cart-current" id="cart-walkin">
+          <div class="cart-empty">Panier vide<br><small>Ajoute des accessoires ci-dessus</small></div>
+        </div>
+
+        <div class="pay-buttons">
+          <button class="pay-btn cb" id="pay-cb" disabled onclick="payWalkin('CB')">💳 CB</button>
+          <button class="pay-btn cash" id="pay-cash" disabled onclick="payWalkin('Espèces')">💶 Espèces</button>
+        </div>
+
+        <div class="ticket" id="ticket-walkin">
+          <div class="ticket-head">
+            <div class="b">EN<span class="py">B</span>ALLE</div>
+            <div style="font-size:9px;margin-top:4px">15 rue des Carmes · 40100 Dax</div>
+            <div style="font-size:9px">SIRET 123 456 789 00012</div>
+          </div>
+          <div id="ticket-lines"></div>
+          <div class="ticket-foot">
+            Ticket NF525 · Hash: <span id="ticket-hash"></span><br>
+            Merci de votre visite !
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col admin">
+    <div class="col-header">
+      <div>
+        <h2>Back-office admin<span>vision temps réel toi</span></h2>
+      </div>
+      <div class="col-icon">📊</div>
+    </div>
+    <div class="col-body">
+      <div class="admin-kpis">
+        <div class="admin-kpi green" id="kpi-ca">
+          <div class="lbl">CA aujourd'hui</div>
+          <div class="v">0 €</div>
+          <div class="delta" id="kpi-ca-delta">Aucune vente encore</div>
+        </div>
+        <div class="admin-kpi pink" id="kpi-resa">
+          <div class="lbl">Réservations</div>
+          <div class="v">0</div>
+          <div class="delta">À traiter aujourd'hui</div>
+        </div>
+        <div class="admin-kpi purple" id="kpi-loc">
+          <div class="lbl">En location</div>
+          <div class="v">0</div>
+          <div class="delta">Costumes sortis</div>
+        </div>
+        <div class="admin-kpi orange" id="kpi-caut">
+          <div class="lbl">Cautions</div>
+          <div class="v">0 €</div>
+          <div class="delta">Bloquées Stripe</div>
+        </div>
+      </div>
+
+      <div class="admin-section">
+        <h4>Activité <span>● Live</span></h4>
+        <div class="feed" id="feed">
+          <div class="empty">Aucune activité encore<br><small>Réserve un costume sur le site →</small></div>
+        </div>
+      </div>
+
+      <div class="admin-section">
+        <h4>Stock costumes</h4>
+        <div class="stock-mini" id="stock-mini"></div>
+      </div>
+
+      <div class="admin-section">
+        <h4>🔓 Casiers 24/7 <span id="locker-status">3/12 utilisés</span></h4>
+        <div class="locker-bank">
+          <div class="locker-grid" id="locker-grid"></div>
+          <div class="locker-legend">
+            <div class="locker-legend-item"><div class="locker-legend-dot empty"></div>Vide</div>
+            <div class="locker-legend-item"><div class="locker-legend-dot deposited"></div>Déposé</div>
+            <div class="locker-legend-item"><div class="locker-legend-dot collected"></div>Récupéré</div>
+            <div class="locker-legend-item"><div class="locker-legend-dot returned"></div>Retourné</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="admin-section">
+        <h4>Cautions actives</h4>
+        <div class="deposits-list" id="deposits-list">
+          <div class="empty">Aucune caution active</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="modal-resa">
+  <div class="modal-content">
+    <div class="modal-head">
+      <h3>Réserver ce costume</h3>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-product" id="modal-product"></div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Date début</label>
+          <input type="date" id="date-start">
+        </div>
+        <div class="form-group">
+          <label>Date fin</label>
+          <input type="date" id="date-end">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Mode de retrait</label>
+        <div class="pickup-choice">
+          <div class="pickup-opt active" data-pickup="boutique" onclick="selectPickup('boutique',this)">
+            <div class="po-em">🏪</div>
+            <div class="po-info">
+              <div class="po-nm">Retrait boutique</div>
+              <div class="po-mt">10h-19h · gratuit · essayage possible</div>
+            </div>
+            <div class="po-check">✓</div>
+          </div>
+          <div class="pickup-opt" data-pickup="casier" onclick="selectPickup('casier',this)">
+            <div class="po-em">🔓</div>
+            <div class="po-info">
+              <div class="po-nm">Casier 24/7 <span class="po-badge">NEW</span></div>
+              <div class="po-mt">+5€ · accessible nuit/dimanche · code SMS</div>
+            </div>
+            <div class="po-check">✓</div>
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Votre nom</label>
+        <input type="text" id="cust-name" placeholder="Ex : Marie Dupont" value="Marie Dupont">
+      </div>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="cust-email" placeholder="marie@example.com" value="marie@example.com">
+      </div>
+      <div class="summary-box" id="summary-box"></div>
+      <div class="deposit-note">
+        <strong>🔒 À propos de la caution</strong><br>
+        Le montant de caution sera <strong>bloqué temporairement</strong> sur ta carte (jamais débité). Libération automatique au retour si tout est OK.
+      </div>
+      <button class="btn-pay" onclick="confirmReservation()">
+        <span>Réserver et payer</span>
+        <span style="font-family:'Anton',sans-serif;letter-spacing:1px" id="btn-amount">— €</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="modal-litige">
+  <div class="modal-content">
+    <div class="modal-head">
+      <h3>⚠️ Ouvrir un litige</h3>
+      <button class="modal-close" onclick="closeLitige()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="litige-banner">
+        <div class="icon">!</div>
+        <div class="info">
+          <h4>Costume retourné en mauvais état</h4>
+          <p>Documente le problème · le client sera notifié</p>
+        </div>
+      </div>
+
+      <div class="modal-product" id="litige-product"></div>
+
+      <label style="display:block;font-size:11px;font-weight:700;color:var(--grey-700);letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">Type de problème</label>
+      <div class="state-eval" id="litige-states"></div>
+
+      <label style="display:block;font-size:11px;font-weight:700;color:var(--grey-700);letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px">Montant à capturer</label>
+      <div class="amount-input-wrap">
+        <input type="number" id="litige-amount" value="35" min="0">
+        <span class="eur">€</span>
+      </div>
+      <div class="quick-amounts" id="quick-amounts"></div>
+
+      <div class="summary-box">
+        <div class="summary-row"><span>Caution bloquée</span><span id="lit-caution">0€</span></div>
+        <div class="summary-row" style="color:var(--red)"><span>Capture</span><span id="lit-capture">- 0€</span></div>
+        <div class="summary-row" style="color:var(--green)"><span>Libéré au client</span><span id="lit-release">0€</span></div>
+      </div>
+
+      <div class="deposit-note" style="background:var(--orange-bg);color:#9A3412">
+        <strong>📧 Email automatique au client</strong><br>Le client reçoit le détail avec photos. Il peut contester sous 7 jours.
+      </div>
+
+      <button class="btn-pay danger" onclick="confirmLitige()">
+        <span>Capturer la caution</span>
+        <span style="font-family:'Anton',sans-serif;letter-spacing:1px" id="lit-btn-amt">35€</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="kiosk-overlay" id="kiosk-overlay">
+  <div class="kiosk-header">
+    <div>
+      <span class="b">EN<span class="py">B</span>ALLE<span class="tg">BORNE LIBRE-SERVICE</span></span>
+    </div>
+    <button class="kiosk-exit" onclick="closeKiosk()">✕ Quitter mode borne</button>
+  </div>
+  <div class="kiosk-body">
+    <div class="kiosk-hero">
+      <h1>Réservez en <span class="py">2 minutes</span></h1>
+      <p>Choisissez votre costume · paiement sécurisé · caution bloquée non débitée</p>
+    </div>
+    <div class="kiosk-grid" id="kiosk-grid"></div>
+  </div>
+</div>
+
+<div class="toast-zone" id="toast-zone"></div>
+
+<div class="explainer" id="explainer">
+  <div class="ico">💡</div>
+  <div class="explainer-text">
+    <strong>Démo interactive :</strong> Réserve un costume sur le site → vois-le apparaître à la caisse → traite-le → suis tout en temps réel dans l'admin
+  </div>
+</div>
+
+<script>
+const PRODUCTS = [
+  {id:'C0142', name:'Disco Gold Suit', emoji:'🪩', cat:'disco', price:35, deposit:80, stock:3, totalStock:4},
+  {id:'C0218', name:'Vampire Royal', emoji:'🧛', cat:'halloween', price:42, deposit:100, stock:4, totalStock:6},
+  {id:'C0095', name:'Rockstar 80s', emoji:'🎸', cat:'disco', price:38, deposit:90, stock:2, totalStock:8},
+  {id:'C0301', name:'EVJF Princesse', emoji:'👰', cat:'evg', price:28, deposit:60, stock:5, totalStock:10},
+  {id:'C0089', name:'Gatsby Tie', emoji:'🎩', cat:'disco', price:45, deposit:120, stock:3, totalStock:8},
+  {id:'C0187', name:'Pirate Capitaine', emoji:'🏴‍☠️', cat:'halloween', price:32, deposit:70, stock:1, totalStock:5}
+];
+
+let state = {
+  products: JSON.parse(JSON.stringify(PRODUCTS)),
+  reservations: [],
+  ca: 0,
+  ventes: 0,
+  cautions: 0,
+  enLocation: 0,
+  feed: [],
+  walkinCart: [],
+  currentReservation: null,
+  filter: 'all',
+  pickupMode: 'boutique',
+  lockers: Array.from({length: 12}, (_, i) => ({num: i + 1, status: 'empty', resaRef: null}))
+};
+
+function $(id){return document.getElementById(id)}
+function fmt(n){return Math.round(n).toLocaleString('fr-FR') + ' €'}
+
+function renderProducts(){
+  const grid = $('product-grid');
+  const filtered = state.filter === 'all' ? state.products : state.products.filter(p => p.cat === state.filter);
+  grid.innerHTML = filtered.map(p => {
+    const out = p.stock === 0;
+    const low = p.stock <= 1 && !out;
+    const clickHandler = out ? '' : 'openModal(\'' + p.id + '\')';
+    return `
+    <div class="product ${out ? 'out-of-stock' : ''}" onclick="${clickHandler}">
+      <div class="thumb">
+        ${p.emoji}
+        <span class="stock-badge ${low ? 'low' : ''}">${p.stock} dispo</span>
+      </div>
+      <div class="nm">${p.name}</div>
+      <div class="meta">REF ${p.id}</div>
+      <div class="price">
+        <span class="v">${p.price}€<span class="s">/jour</span></span>
+        <span class="s">+${p.deposit}€ caut.</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderStockMini(){
+  const wrap = $('stock-mini');
+  wrap.innerHTML = state.products.map(p => {
+    const cls = p.stock === 0 ? 'out' : (p.stock <= 1 ? 'low' : '');
+    return `
+    <div class="stock-mini-row">
+      <div class="em">${p.emoji}</div>
+      <div class="nm">${p.name}</div>
+      <div class="qty ${cls}" data-id="${p.id}">${p.stock}/${p.totalStock}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderKPIs(){
+  $('stat-ca').textContent = fmt(state.ca);
+  $('stat-ventes').textContent = state.ventes;
+  $('stat-cautions').textContent = fmt(state.cautions);
+
+  const ca = $('kpi-ca');
+  ca.querySelector('.v').textContent = fmt(state.ca);
+  ca.querySelector('.delta').textContent = state.ventes > 0 ? `${state.ventes} transactions` : 'Aucune vente encore';
+
+  $('kpi-resa').querySelector('.v').textContent = state.reservations.filter(r => r.status === 'pending').length;
+  $('kpi-loc').querySelector('.v').textContent = state.enLocation;
+  $('kpi-caut').querySelector('.v').textContent = fmt(state.cautions);
+}
+
+function renderPickupList(){
+  const list = $('pickup-list');
+  const pending = state.reservations.filter(r => r.status === 'pending');
+  if(pending.length === 0){
+    list.innerHTML = '<div class="empty">Aucune réservation à retirer<br><small style="color:var(--grey-500);font-size:10px;display:block;margin-top:4px">Les nouvelles réservations du site apparaîtront ici</small></div>';
+    return;
+  }
+  list.innerHTML = pending.map(r => `
+    <div class="pickup-card">
+      <div class="top">
+        <span class="ref">#${r.ref}</span>
+        <span class="time">${r.pickupMode === 'casier' ? '🔓 Casier 24/7' : '🏪 Boutique'}</span>
+      </div>
+      <div class="cust">${r.customer}</div>
+      <div class="items">${r.product.emoji} ${r.product.name} · ${r.days}j · ${r.total}€</div>
+      <div class="actions">
+        <button class="btn-act primary" onclick="processSortie('${r.ref}')">${r.pickupMode === 'casier' ? '🔓 Déposer au casier' : '📤 Sortir le costume'}</button>
+      </div>
+    </div>
+  `).join('');
+
+  const inProgress = state.reservations.filter(r => r.status === 'out');
+  if(inProgress.length > 0){
+    list.innerHTML += '<div style="margin-top:14px;font-size:10px;font-weight:800;color:var(--grey-500);letter-spacing:1px;text-transform:uppercase">En location</div>';
+    inProgress.forEach(r => {
+      list.innerHTML += `
+        <div class="pickup-card confirmed">
+          <div class="top">
+            <span class="ref">#${r.ref}</span>
+            <span class="time">${r.locker ? '🔓 Casier N°' + r.locker : 'sorti'}</span>
+          </div>
+          <div class="cust">${r.customer}</div>
+          <div class="items">${r.product.emoji} ${r.product.name} · caution ${r.deposit}€</div>
+          <div class="actions">
+            <button class="btn-act success" onclick="processRetour('${r.ref}')">↩️ Retour OK</button>
+            <button class="btn-act" style="background:var(--red);color:#fff" onclick="openLitige('${r.ref}')">⚠️ Litige</button>
+          </div>
+        </div>
+      `;
+    });
+  }
+}
+
+function renderFeed(){
+  const wrap = $('feed');
+  if(state.feed.length === 0){
+    wrap.innerHTML = '<div class="empty">Aucune activité encore<br><small>Réserve un costume sur le site →</small></div>';
+    return;
+  }
+  wrap.innerHTML = state.feed.slice(0, 8).map(f => `
+    <div class="feed-item">
+      <div class="ico ${f.color}">${f.icon}</div>
+      <div class="info">
+        <div class="ttl">${f.title}</div>
+        <div class="meta">${f.meta}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderDeposits(){
+  const wrap = $('deposits-list');
+  const active = state.reservations.filter(r => r.status === 'out');
+  if(active.length === 0){
+    wrap.innerHTML = '<div class="empty">Aucune caution active</div>';
+    return;
+  }
+  wrap.innerHTML = active.map(r => `
+    <div class="deposit-row">
+      <div class="info">
+        <div class="nm">${r.customer}</div>
+        <div class="meta">#${r.ref} · ${r.product.name}</div>
+      </div>
+      <div class="amt">${r.deposit}€</div>
+    </div>
+  `).join('');
+}
+
+function renderAll(){
+  renderProducts();
+  renderStockMini();
+  renderKPIs();
+  renderPickupList();
+  renderFeed();
+  renderDeposits();
+  renderWalkinCart();
+  renderLockers();
+}
+
+function flashKPI(id){
+  const el = $(id);
+  el.classList.remove('flash');
+  void el.offsetWidth;
+  el.classList.add('flash');
+}
+
+function flashStock(productId){
+  const el = document.querySelector(`[data-id="${productId}"]`);
+  if(el){
+    el.classList.remove('flash');
+    void el.offsetWidth;
+    el.classList.add('flash');
+  }
+}
+
+function toast(title, meta, color){
+  const z = $('toast-zone');
+  const t = document.createElement('div');
+  t.className = `toast ${color || ''}`;
+  t.innerHTML = `<strong>${title}</strong><small>${meta}</small>`;
+  z.appendChild(t);
+  setTimeout(() => {
+    t.style.animation = 'slideIn .3s reverse';
+    setTimeout(() => t.remove(), 300);
+  }, 3500);
+}
+
+function addToFeed(icon, color, title, meta){
+  state.feed.unshift({icon, color, title, meta});
+  renderFeed();
+}
+
+function filterCat(cat, btn){
+  state.filter = cat;
+  document.querySelectorAll('.filter-chip').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderProducts();
+}
+
+function openModal(productId){
+  const p = state.products.find(x => x.id === productId);
+  if(!p || p.stock === 0) return;
+  state.currentReservation = p;
+
+  const today = new Date();
+  const tomorrow = new Date(today.getTime() + 86400000);
+  const after = new Date(today.getTime() + 2 * 86400000);
+  $('date-start').value = tomorrow.toISOString().split('T')[0];
+  $('date-end').value = after.toISOString().split('T')[0];
+  $('date-start').min = today.toISOString().split('T')[0];
+
+  $('modal-product').innerHTML = `
+    <div class="t">${p.emoji}</div>
+    <div class="info">
+      <div class="nm">${p.name}</div>
+      <div class="meta">REF ${p.id} · ${p.stock} disponibles</div>
+      <div class="price">${p.price}€/jour · caution ${p.deposit}€</div>
+    </div>
+  `;
+  state.pickupMode = 'boutique';
+  document.querySelectorAll('.pickup-opt').forEach(o => o.classList.remove('active'));
+  const firstOpt = document.querySelector('.pickup-opt[data-pickup="boutique"]');
+  if(firstOpt) firstOpt.classList.add('active');
+  updateSummary();
+  $('modal-resa').classList.add('show');
+}
+
+function updateSummary(){
+  const p = state.currentReservation;
+  if(!p) return;
+  const start = new Date($('date-start').value);
+  const end = new Date($('date-end').value);
+  const days = Math.max(1, Math.ceil((end - start) / 86400000));
+  const locFee = state.pickupMode === 'casier' ? 5 : 0;
+  const total = p.price * days + locFee;
+  let html = `<div class="summary-row"><span>Location ${days} jour${days > 1 ? 's' : ''}</span><span>${p.price * days}€</span></div>`;
+  if(locFee > 0){
+    html += `<div class="summary-row"><span>🔓 Service casier 24/7</span><span>+${locFee}€</span></div>`;
+  }
+  html += `
+    <div class="summary-row" style="color:var(--grey-500)"><span>Caution (bloquée)</span><span>${p.deposit}€</span></div>
+    <div class="summary-row tot"><span>Total à payer</span><span class="v">${total}€</span></div>
+  `;
+  $('summary-box').innerHTML = html;
+  $('btn-amount').textContent = `${total}€`;
+}
+
+$('date-start').addEventListener('change', updateSummary);
+$('date-end').addEventListener('change', updateSummary);
+
+function closeModal(){
+  $('modal-resa').classList.remove('show');
+  state.currentReservation = null;
+}
+
+function confirmReservation(){
+  const p = state.currentReservation;
+  const start = new Date($('date-start').value);
+  const end = new Date($('date-end').value);
+  const days = Math.max(1, Math.ceil((end - start) / 86400000));
+  const locFee = state.pickupMode === 'casier' ? 5 : 0;
+  const total = p.price * days + locFee;
+  const ref = 'ENB' + Math.floor(Math.random() * 9000 + 1000);
+  const customer = $('cust-name').value || 'Client';
+  const pickupMode = state.pickupMode;
+
+  p.stock--;
+  state.reservations.push({
+    ref, customer, product: p, days, total, deposit: p.deposit, status: 'pending', pickupMode, locker: null
+  });
+
+  state.ca += total;
+  state.ventes++;
+  state.cautions += p.deposit;
+
+  closeModal();
+  playSound('newOrder');
+  vibrate([200, 80, 200]);
+  ringPosTab();
+  const pickupLabel = pickupMode === 'casier' ? '🔓 Casier 24/7' : '🏪 Boutique';
+  toast('🎉 Réservation envoyée !', `${customer} · ${p.name} · ${total}€`, '');
+  setTimeout(() => toast('🔒 Caution bloquée Stripe', `${p.deposit}€ pré-autorisés`, 'orange'), 600);
+  setTimeout(() => toast('📲 ' + pickupLabel, `À préparer pour ${customer}`, 'green'), 1200);
+
+  addToFeed('+', 'pink', `Nouvelle résa #${ref} · ${pickupLabel}`, `${customer} · ${total}€ + ${p.deposit}€ caut.`);
+
+  flashKPI('kpi-ca');
+  flashKPI('kpi-resa');
+  flashKPI('kpi-caut');
+  flashStock(p.id);
+  renderAll();
+}
+
+function processSortie(ref){
+  const r = state.reservations.find(x => x.ref === ref);
+  if(!r) return;
+  r.status = 'out';
+  state.enLocation++;
+  playSound('success');
+  vibrate(80);
+
+  if(r.pickupMode === 'casier'){
+    const locker = findFreeLocker();
+    if(locker){
+      locker.status = 'deposited';
+      locker.resaRef = r.ref;
+      r.locker = locker.num;
+      const code = Math.floor(Math.random() * 9000 + 1000);
+      toast('🔓 Costume déposé casier N°' + locker.num, `Code SMS envoyé à ${r.customer} : ${code}`, 'green');
+      addToFeed('🔓', 'purple', `Casier N°${locker.num} préparé`, `#${r.ref} · ${r.customer} · code ${code} envoyé`);
+      setTimeout(() => {
+        locker.status = 'collected';
+        toast('🎭 Costume récupéré', `${r.customer} a ouvert le casier N°${locker.num}`, '');
+        addToFeed('→', 'pink', `Retrait casier N°${locker.num}`, `#${r.ref} · ${r.customer} · pré-auth caution active`);
+        renderAll();
+      }, 4000);
+    } else {
+      toast('⚠️ Aucun casier libre', 'Bascule sur retrait boutique', 'red');
+    }
+  } else {
+    toast('📤 Costume sorti', `${r.customer} · pré-auth confirmée`, 'green');
+    addToFeed('↗', 'purple', `Sortie costume ${r.product.name}`, `#${r.ref} · ${r.customer} · caution ${r.deposit}€ active`);
+  }
+
+  flashKPI('kpi-loc');
+  renderAll();
+}
+
+function processRetour(ref){
+  const r = state.reservations.find(x => x.ref === ref);
+  if(!r) return;
+  r.status = 'returned';
+  state.enLocation--;
+  state.cautions -= r.deposit;
+  r.product.stock++;
+  playSound('success');
+  vibrate(80);
+
+  if(r.locker){
+    const locker = state.lockers.find(l => l.num === r.locker);
+    if(locker){
+      locker.status = 'returned';
+      toast('↩️ Retour casier N°' + r.locker, `${r.customer} a redéposé le costume`, 'green');
+      setTimeout(() => {
+        locker.status = 'empty';
+        locker.resaRef = null;
+        renderAll();
+      }, 3500);
+    }
+  }
+
+  toast('✅ Retour validé', `${r.product.name} · état OK`, 'green');
+  setTimeout(() => toast('💰 Caution libérée', `${r.deposit}€ rendus à ${r.customer}`, 'green'), 600);
+
+  addToFeed('✓', 'green', `Retour costume #${r.ref}`, `${r.customer} · état OK · ${r.deposit}€ libérés`);
+
+  flashKPI('kpi-loc');
+  flashKPI('kpi-caut');
+  flashStock(r.product.id);
+  renderAll();
+}
+
+function posTab(name, btn){
+  document.querySelectorAll('.pos-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.pos-pane').forEach(p => p.classList.remove('active'));
+  $('pane-' + name).classList.add('active');
+}
+
+function addAccessory(name, emoji, price){
+  state.walkinCart.push({name, emoji, price});
+  renderWalkinCart();
+}
+
+function removeFromCart(idx){
+  state.walkinCart.splice(idx, 1);
+  renderWalkinCart();
+}
+
+function renderWalkinCart(){
+  const wrap = $('cart-walkin');
+  if(state.walkinCart.length === 0){
+    wrap.classList.remove('has-items');
+    wrap.innerHTML = '<div class="cart-empty">Panier vide<br><small>Ajoute des accessoires ci-dessus</small></div>';
+    $('pay-cb').disabled = true;
+    $('pay-cash').disabled = true;
+    $('ticket-walkin').classList.remove('show');
+    return;
+  }
+  wrap.classList.add('has-items');
+  const total = state.walkinCart.reduce((s, i) => s + i.price, 0);
+  wrap.innerHTML = state.walkinCart.map((i, idx) => `
+    <div class="cart-line">
+      <span class="nm">${i.emoji} ${i.name}</span>
+      <span><span class="pr">${i.price}€</span><span class="rm" onclick="removeFromCart(${idx})">×</span></span>
+    </div>
+  `).join('') + `
+    <div class="cart-total">
+      <span>Total</span>
+      <span class="v">${total}€</span>
+    </div>
+  `;
+  $('pay-cb').disabled = false;
+  $('pay-cash').disabled = false;
+}
+
+function payWalkin(method){
+  const total = state.walkinCart.reduce((s, i) => s + i.price, 0);
+  state.ca += total;
+  state.ventes++;
+  playSound('cash');
+  vibrate(60);
+
+  const hash = Math.random().toString(36).substring(2, 10).toUpperCase();
+  const lines = state.walkinCart.map(i => `
+    <div class="ticket-line"><span>${i.name}</span><span>${i.price.toFixed(2)}€</span></div>
+  `).join('');
+
+  $('ticket-lines').innerHTML = lines + `
+    <div class="ticket-line ticket-tot"><span>TOTAL TTC</span><span>${total.toFixed(2)}€</span></div>
+    <div class="ticket-line" style="margin-top:6px"><span>Paiement ${method}</span><span>✓ OK</span></div>
+    <div class="ticket-line"><span>TVA 20%</span><span>${(total * 0.2 / 1.2).toFixed(2)}€</span></div>
+  `;
+  $('ticket-hash').textContent = hash;
+  $('ticket-walkin').classList.add('show');
+
+  toast('🎟️ Ticket NF525 émis', `Vente ${total}€ · ${method}`, 'green');
+  addToFeed('€', 'pink', `Vente accessoires ${total}€`, `${state.walkinCart.length} articles · ${method} · NF525`);
+
+  state.walkinCart = [];
+  flashKPI('kpi-ca');
+  setTimeout(() => renderWalkinCart(), 100);
+  renderAll();
+}
+
+function resetAll(){
+  state = {
+    products: JSON.parse(JSON.stringify(PRODUCTS)),
+    reservations: [], ca: 0, ventes: 0, cautions: 0, enLocation: 0,
+    feed: [], walkinCart: [], currentReservation: null, filter: 'all',
+    pickupMode: 'boutique',
+    lockers: Array.from({length: 12}, (_, i) => ({num: i + 1, status: 'empty', resaRef: null}))
+  };
+  $('ticket-walkin').classList.remove('show');
+  toast('🔄 Démo réinitialisée', 'Prêt pour un nouveau parcours', '');
+  renderAll();
+}
+
+function updateClock(){
+  const d = new Date();
+  $('pos-clock').textContent = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+
+function renderLockers(){
+  const grid = $('locker-grid');
+  if(!grid) return;
+  grid.innerHTML = state.lockers.map(l => `
+    <div class="locker-cell ${l.status}">
+      <div class="num">N°${l.num}</div>
+      ${l.resaRef ? `<div class="ref">#${l.resaRef.slice(-3)}</div>` : ''}
+    </div>
+  `).join('');
+  const used = state.lockers.filter(l => l.status !== 'empty').length;
+  $('locker-status').textContent = `${used}/12 utilisés`;
+}
+
+function selectPickup(mode, btn){
+  state.pickupMode = mode;
+  document.querySelectorAll('.pickup-opt').forEach(o => o.classList.remove('active'));
+  btn.classList.add('active');
+  updateSummary();
+  playSound('click');
+}
+
+function findFreeLocker(){
+  return state.lockers.find(l => l.status === 'empty');
+}
+
+// ===== SOUND & VIBRATION =====
+let soundEnabled = true;
+let audioCtx = null;
+
+function toggleSound(){
+  soundEnabled = !soundEnabled;
+  $('sound-btn').textContent = soundEnabled ? '🔊 Son ON' : '🔇 Son OFF';
+}
+
+function playSound(type){
+  if(!soundEnabled) return;
+  try {
+    if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = audioCtx;
+    if(ctx.state === 'suspended') ctx.resume();
+
+    const playTone = (freq, duration, delay = 0, vol = 0.15) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = freq;
+      osc.type = 'sine';
+      const start = ctx.currentTime + delay;
+      gain.gain.setValueAtTime(0, start);
+      gain.gain.linearRampToValueAtTime(vol, start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + duration);
+      osc.start(start);
+      osc.stop(start + duration);
+    };
+
+    if(type === 'newOrder'){
+      playTone(880, 0.15, 0);
+      playTone(1175, 0.15, 0.1);
+      playTone(1568, 0.25, 0.2);
+    } else if(type === 'success'){
+      playTone(523, 0.1, 0);
+      playTone(784, 0.2, 0.08);
+    } else if(type === 'cash'){
+      playTone(1000, 0.05, 0);
+      playTone(1200, 0.05, 0.06);
+      playTone(1400, 0.1, 0.12);
+    } else if(type === 'alert'){
+      playTone(600, 0.15, 0);
+      playTone(450, 0.2, 0.15);
+    } else if(type === 'click'){
+      playTone(800, 0.04, 0, 0.08);
+    }
+  } catch(e){}
+}
+
+function vibrate(pattern){
+  if(navigator.vibrate) navigator.vibrate(pattern);
+}
+
+function ringPosTab(){
+  const tab = document.querySelector('.mobile-tab.pos');
+  if(tab && !tab.classList.contains('active')){
+    tab.classList.add('ringing');
+    setTimeout(() => tab.classList.remove('ringing'), 1500);
+  }
+}
+
+// ===== LITIGE =====
+const LITIGE_TYPES = [
+  {id:'tache', em:'🍷', lb:'Tache / sale', pr:'Nettoyage', amount:35, level:'minor'},
+  {id:'dechir', em:'✂️', lb:'Déchirure', pr:'Réparation', amount:60, level:'minor'},
+  {id:'detruit', em:'❌', lb:'Détruit', pr:'Caution totale', amount:0, level:'major'},
+  {id:'manque', em:'🔎', lb:'Pièce manquante', pr:'Au coût', amount:25, level:'minor'}
+];
+let currentLitige = null;
+let selectedLitigeType = null;
+
+function openLitige(ref){
+  const r = state.reservations.find(x => x.ref === ref);
+  if(!r) return;
+  currentLitige = r;
+  playSound('alert');
+  vibrate(100);
+
+  $('litige-product').innerHTML = `
+    <div class="t">${r.product.emoji}</div>
+    <div class="info">
+      <div class="nm">${r.product.name}</div>
+      <div class="meta">${r.customer} · #${r.ref}</div>
+      <div class="price">Caution bloquée : ${r.deposit}€</div>
+    </div>
+  `;
+
+  $('litige-states').innerHTML = LITIGE_TYPES.map(t => `
+    <div class="state-card" data-type="${t.id}" onclick="selectLitigeType('${t.id}')">
+      <div class="em">${t.em}</div>
+      <div class="lb">${t.lb}</div>
+      <div class="pr">${t.pr}</div>
+    </div>
+  `).join('');
+
+  const amounts = [15, 35, 60, r.deposit];
+  $('quick-amounts').innerHTML = amounts.map(a => `
+    <button class="quick-amount" onclick="setLitigeAmount(${a},this)">${a}€</button>
+  `).join('');
+
+  $('litige-amount').max = r.deposit;
+  $('litige-amount').value = 35;
+  selectedLitigeType = null;
+  updateLitigeSummary();
+  $('modal-litige').classList.add('show');
+}
+
+function selectLitigeType(typeId){
+  selectedLitigeType = typeId;
+  document.querySelectorAll('.state-card').forEach(c => {
+    c.classList.remove('selected', 'minor', 'major');
+  });
+  const t = LITIGE_TYPES.find(x => x.id === typeId);
+  const card = document.querySelector(`.state-card[data-type="${typeId}"]`);
+  card.classList.add('selected', t.level);
+  const amount = t.id === 'detruit' ? currentLitige.deposit : t.amount;
+  $('litige-amount').value = amount;
+  updateLitigeSummary();
+  playSound('click');
+}
+
+function setLitigeAmount(amt, btn){
+  $('litige-amount').value = amt;
+  document.querySelectorAll('.quick-amount').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  updateLitigeSummary();
+  playSound('click');
+}
+
+$('litige-amount').addEventListener('input', updateLitigeSummary);
+
+function updateLitigeSummary(){
+  if(!currentLitige) return;
+  const cap = Math.min(parseInt($('litige-amount').value) || 0, currentLitige.deposit);
+  const rel = currentLitige.deposit - cap;
+  $('lit-caution').textContent = currentLitige.deposit + '€';
+  $('lit-capture').textContent = '- ' + cap + '€';
+  $('lit-release').textContent = rel + '€';
+  $('lit-btn-amt').textContent = cap + '€';
+}
+
+function closeLitige(){
+  $('modal-litige').classList.remove('show');
+  currentLitige = null;
+  selectedLitigeType = null;
+}
+
+function confirmLitige(){
+  const r = currentLitige;
+  const cap = Math.min(parseInt($('litige-amount').value) || 0, r.deposit);
+  const rel = r.deposit - cap;
+
+  r.status = 'returned';
+  state.enLocation--;
+  state.cautions -= r.deposit;
+  state.ca += cap;
+  r.product.stock++;
+
+  closeLitige();
+  playSound('alert');
+  vibrate([100, 50, 100]);
+
+  toast('⚠️ Litige enregistré', `${cap}€ capturés sur la caution`, 'red');
+  setTimeout(() => toast('💰 Solde libéré', `${rel}€ rendus au client`, 'orange'), 600);
+  setTimeout(() => toast('📧 Email envoyé', `Notification + photos preuves`, ''), 1200);
+
+  addToFeed('!', 'orange', `Litige sur #${r.ref}`, `${r.customer} · capture ${cap}€ · ${rel}€ libérés`);
+
+  flashKPI('kpi-loc');
+  flashKPI('kpi-caut');
+  flashKPI('kpi-ca');
+  flashStock(r.product.id);
+  renderAll();
+}
+
+// ===== KIOSK MODE =====
+function openKiosk(){
+  $('kiosk-overlay').classList.add('show');
+  document.body.style.overflow = 'hidden';
+  renderKiosk();
+  playSound('success');
+}
+
+function closeKiosk(){
+  $('kiosk-overlay').classList.remove('show');
+  document.body.style.overflow = '';
+}
+
+function renderKiosk(){
+  const grid = $('kiosk-grid');
+  grid.innerHTML = state.products.map(p => {
+    const out = p.stock === 0;
+    const low = p.stock <= 1 && !out;
+    const clickHandler = out ? '' : 'kioskSelect(\'' + p.id + '\')';
+    return `
+      <div class="kiosk-product ${out ? 'out' : ''}" onclick="${clickHandler}">
+        <div class="thumb">
+          ${p.emoji}
+          <span class="stk ${low ? 'low' : ''}">${p.stock} dispo</span>
+        </div>
+        <div class="nm">${p.name}</div>
+        <div class="meta">REF ${p.id}</div>
+        <div class="price">${p.price}€/jour</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function kioskSelect(productId){
+  closeKiosk();
+  setTimeout(() => openModal(productId), 200);
+}
+
+function switchMobileTab(name, btn){
+  document.querySelectorAll('.mobile-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.col').forEach(c => c.classList.remove('active-mobile'));
+  document.querySelector('.col.' + name).classList.add('active-mobile');
+  window.scrollTo({top: 0, behavior: 'smooth'});
+}
+
+function updatePosBadge(){
+  const pending = state.reservations.filter(r => r.status === 'pending').length;
+  const badge = $('pos-badge');
+  if(pending > 0){
+    badge.style.display = 'block';
+    badge.textContent = pending;
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+const _origRenderAll = renderAll;
+renderAll = function(){
+  _origRenderAll();
+  updatePosBadge();
+};
+
+renderAll();
+updateClock();
+setInterval(updateClock, 30000);
+</script>
+</body>
+</html>
